@@ -108,6 +108,7 @@ body {
   font-weight: 600;
   background: linear-gradient(to right, var(--text-strong), var(--text-dim));
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
