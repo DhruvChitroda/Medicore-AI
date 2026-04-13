@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   Chart as ChartJS,
@@ -17,73 +17,8 @@ ChartJS.defaults.font.family = "'Outfit', sans-serif";
 
 const API_BASE = 'http://localhost:8000';
 
-const NORMAL_RANGES = {
-  hemoglobin: { category: 'Complete Blood Count (CBC)', min: 12.0, max: 17.5, unit: 'g/dL', name: 'Hemoglobin' },
-  rbc_count: { category: 'Complete Blood Count (CBC)', min: 4.0, max: 6.2, unit: 'million/μL', name: 'RBC Count' },
-  wbc_count: { category: 'Complete Blood Count (CBC)', min: 4.0, max: 11.0, unit: 'thousand/μL', name: 'WBC Count' },
-  platelets: { category: 'Complete Blood Count (CBC)', min: 150, max: 450, unit: 'thousand/μL', name: 'Platelets' },
-  hematocrit: { category: 'Complete Blood Count (CBC)', min: 38.0, max: 50.0, unit: '%', name: 'Hematocrit' },
-  mcv: { category: 'Complete Blood Count (CBC)', min: 80.0, max: 100.0, unit: 'fL', name: 'MCV' },
-  mch: { category: 'Complete Blood Count (CBC)', min: 27.0, max: 33.0, unit: 'pg', name: 'MCH' },
-  mchc: { category: 'Complete Blood Count (CBC)', min: 32.0, max: 36.0, unit: 'g/dL', name: 'MCHC' },
-  rdw: { category: 'Complete Blood Count (CBC)', min: 11.5, max: 14.5, unit: '%', name: 'RDW' },
-  neutrophils: { category: 'Complete Blood Count (CBC)', min: 40.0, max: 80.0, unit: '%', name: 'Neutrophils' },
-  lymphocytes: { category: 'Complete Blood Count (CBC)', min: 20.0, max: 40.0, unit: '%', name: 'Lymphocytes' },
-  monocytes: { category: 'Complete Blood Count (CBC)', min: 2.0, max: 10.0, unit: '%', name: 'Monocytes' },
-  eosinophils: { category: 'Complete Blood Count (CBC)', min: 1.0, max: 6.0, unit: '%', name: 'Eosinophils' },
-  basophils: { category: 'Complete Blood Count (CBC)', min: 0.0, max: 2.0, unit: '%', name: 'Basophils' },
-  fasting_sugar: { category: 'Diabetes Profile', min: 70, max: 100, unit: 'mg/dL', name: 'Fasting Glucose' },
-  post_prandial_sugar: { category: 'Diabetes Profile', min: 70, max: 140, unit: 'mg/dL', name: 'PP Glucose' },
-  hba1c: { category: 'Diabetes Profile', min: 4.0, max: 5.6, unit: '%', name: 'HbA1c' },
-  random_sugar: { category: 'Diabetes Profile', min: 70, max: 200, unit: 'mg/dL', name: 'Random Glucose' },
-  alt: { category: 'Liver Function Test', min: 7, max: 56, unit: 'U/L', name: 'ALT' },
-  ast: { category: 'Liver Function Test', min: 10, max: 40, unit: 'U/L', name: 'AST' },
-  alp: { category: 'Liver Function Test', min: 44, max: 147, unit: 'U/L', name: 'ALP' },
-  bilirubin: { category: 'Liver Function Test', min: 0.1, max: 1.2, unit: 'mg/dL', name: 'Total Bilirubin' },
-  direct_bilirubin: { category: 'Liver Function Test', min: 0.0, max: 0.3, unit: 'mg/dL', name: 'Direct Bilirubin' },
-  total_protein: { category: 'Liver Function Test', min: 6.0, max: 8.3, unit: 'g/dL', name: 'Total Protein' },
-  albumin: { category: 'Liver Function Test', min: 3.4, max: 5.4, unit: 'g/dL', name: 'Albumin' },
-  globulin: { category: 'Liver Function Test', min: 2.0, max: 3.5, unit: 'g/dL', name: 'Globulin' },
-  ag_ratio: { category: 'Liver Function Test', min: 1.1, max: 2.5, unit: '', name: 'A/G Ratio' },
-  creatinine: { category: 'Kidney Function', min: 0.6, max: 1.2, unit: 'mg/dL', name: 'Creatinine' },
-  bun: { category: 'Kidney Function', min: 7, max: 20, unit: 'mg/dL', name: 'BUN' },
-  bun_creatinine_ratio: { category: 'Kidney Function', min: 10, max: 20, unit: '', name: 'BUN/Cr Ratio' },
-  uric_acid: { category: 'Kidney Function', min: 3.5, max: 7.2, unit: 'mg/dL', name: 'Uric Acid' },
-  egfr: { category: 'Kidney Function', min: 90, max: 120, unit: 'mL/min', name: 'eGFR' },
-  iron: { category: 'Iron Studies', min: 60, max: 170, unit: 'μg/dL', name: 'Serum Iron' },
-  tibc: { category: 'Iron Studies', min: 240, max: 450, unit: 'μg/dL', name: 'TIBC' },
-  ferritin: { category: 'Iron Studies', min: 24, max: 336, unit: 'ng/mL', name: 'Ferritin' },
-  transferrin_sat: { category: 'Iron Studies', min: 20, max: 50, unit: '%', name: 'Transferrin Sat.' },
-  tsh: { category: 'Thyroid Profile', min: 0.4, max: 4.0, unit: 'mIU/L', name: 'TSH' },
-  t3: { category: 'Thyroid Profile', min: 80, max: 200, unit: 'ng/dL', name: 'T3' },
-  t4: { category: 'Thyroid Profile', min: 5.0, max: 12.0, unit: 'μg/dL', name: 'T4' },
-  free_t3: { category: 'Thyroid Profile', min: 2.3, max: 4.1, unit: 'pg/mL', name: 'Free T3' },
-  free_t4: { category: 'Thyroid Profile', min: 0.9, max: 1.7, unit: 'ng/dL', name: 'Free T4' }
-};
-
-const CATEGORIES = [
-  'Complete Blood Count (CBC)',
-  'Liver Function Test',
-  'Kidney Function',
-  'Diabetes Profile',
-  'Iron Studies',
-  'Thyroid Profile'
-];
-
-const Expander = ({ title, children }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <div className={`expander ${isOpen ? 'open' : ''}`}>
-      <button type="button" className="expander-header" onClick={() => setIsOpen(!isOpen)}>
-        <span>{title}</span>
-        <span className="expander-icon">+</span>
-      </button>
-      <div className="expander-content">
-        <div>{children}</div>
-      </div>
-    </div>
-  );
-};
+import { NORMAL_RANGES, CATEGORIES, defaultReportForm } from './constants/medical';
+import Expander from './components/Expander';
 
 export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('med_theme') || 'dark');
@@ -99,6 +34,8 @@ export default function App() {
   const [patientId, setPatientId] = useState(null);
   const [patientDetails, setPatientDetails] = useState(null);
   const [reportData, setReportData] = useState(null);
+  const [allPatients, setAllPatients] = useState([]);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, pId: null, isAllData: false });
 
   // Patient Form
   const [pName, setPName] = useState('');
@@ -108,14 +45,7 @@ export default function App() {
   const [pStatus, setPStatus] = useState('');
 
   // Report Form
-  const [reportForm, setReportForm] = useState({
-    hemoglobin: '', rbc_count: '', wbc_count: '', platelets: '', hematocrit: '', mcv: '', mch: '', mchc: '', rdw: '', neutrophils: '', lymphocytes: '', monocytes: '', eosinophils: '', basophils: '',
-    alt: '', ast: '', alp: '', bilirubin: '', direct_bilirubin: '', total_protein: '', albumin: '', globulin: '', ag_ratio: '',
-    urea: '', creatinine: '', bun: '', bun_creatinine_ratio: '', uric_acid: '', egfr: '',
-    fasting_sugar: '', post_prandial_sugar: '', hba1c: '', random_sugar: '',
-    iron: '', tibc: '', ferritin: '', transferrin_sat: '',
-    tsh: '', t3: '', t4: '', free_t3: '', free_t4: ''
-  });
+  const [reportForm, setReportForm] = useState(defaultReportForm);
   const [rStatus, setRStatus] = useState('Analyze & Save Report');
 
   // Chat
@@ -146,6 +76,65 @@ export default function App() {
         });
     }
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'patient_list') {
+      axios.get(`${API_BASE}/patients/`)
+        .then(res => setAllPatients(res.data))
+        .catch(err => console.error("Failed to fetch patients", err));
+    }
+  }, [activeTab]);
+
+  const switchPatient = async (p) => {
+    const pId = p._id || p.id;
+    try {
+      const res = await axios.get(`${API_BASE}/patients/${pId}/reports/`);
+      setPatientId(pId);
+      setPatientDetails(p);
+      localStorage.setItem('med_patient_id', pId);
+      if (res && res.data && res.data.length > 0) {
+        setReportData(res.data[res.data.length - 1]);
+      } else {
+        setReportData(null);
+      }
+      setPName(p.name);
+      setPAge(p.age.toString());
+      setPGender(p.gender);
+      setPBlood(p.blood_group);
+      setActiveTab('input');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const triggerDelete = (pId, isAllData = false) => {
+    setDeleteModal({ isOpen: true, pId, isAllData });
+  };
+
+  const executeDelete = async () => {
+    const { pId, isAllData } = deleteModal;
+    try {
+      await axios.delete(`${API_BASE}/patients/${pId}`);
+      if (patientId === pId) {
+        setPatientId(null);
+        setPatientDetails(null);
+        setReportData(null);
+        setReportForm(defaultReportForm);
+        localStorage.removeItem('med_patient_id');
+        setPName(''); setPAge(''); setPGender(''); setPBlood(''); setPStatus('');
+        if (isAllData) setActiveTab('input');
+      }
+      setAllPatients(prev => prev.filter(p => (p._id || p.id) !== pId));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDeleteModal({ isOpen: false, pId: null, isAllData: false });
+    }
+  };
+
+  const deleteAnyPatient = (pId) => {
+    triggerDelete(pId, false);
+  };
 
   const handleCreatePatient = async (e) => {
     e.preventDefault();
@@ -197,29 +186,8 @@ export default function App() {
     }
   };
 
-  const handleDeletePatient = async () => {
-    if (!patientId || !window.confirm("Are you sure you want to delete all patient data and reports permanently?")) return;
-    try {
-      await axios.delete(`${API_BASE}/patients/${patientId}`);
-      setPatientId(null);
-      setPatientDetails(null);
-      setReportData(null);
-      setReportForm({
-        hemoglobin: '', rbc_count: '', wbc_count: '', platelets: '', hematocrit: '', mcv: '', mch: '', mchc: '', rdw: '', neutrophils: '', lymphocytes: '', monocytes: '', eosinophils: '', basophils: '',
-        alt: '', ast: '', alp: '', bilirubin: '', direct_bilirubin: '', total_protein: '', albumin: '', globulin: '', ag_ratio: '',
-        urea: '', creatinine: '', bun: '', bun_creatinine_ratio: '', uric_acid: '', egfr: '',
-        fasting_sugar: '', post_prandial_sugar: '', hba1c: '', random_sugar: '',
-        iron: '', tibc: '', ferritin: '', transferrin_sat: '',
-        tsh: '', t3: '', t4: '', free_t3: '', free_t4: ''
-      });
-      localStorage.removeItem('med_patient_id');
-      setPName(''); setPAge(''); setPGender('Male'); setPBlood('O+'); setPStatus('');
-      alert("Patient data deleted successfully.");
-      setActiveTab('input');
-    } catch (err) {
-      console.error(err);
-      alert("Failed to delete patient data.");
-    }
+  const handleDeletePatient = () => {
+    if (patientId) triggerDelete(patientId, true);
   };
 
   const handleChat = async (e) => {
@@ -236,7 +204,7 @@ export default function App() {
     }
   };
 
-  const getChartData = (category) => {
+  const getChartData = useCallback((category) => {
     if (!reportData) return null;
     const labels = [];
     const data = [];
@@ -259,7 +227,7 @@ export default function App() {
       labels,
       datasets: [{ label: 'Patient Values', data, backgroundColor: colors, borderRadius: 4 }]
     };
-  };
+  }, [reportData]);
 
   return (
     <div className="app-container">
@@ -332,9 +300,9 @@ export default function App() {
       {/* Main Area */}
       <main className="main-content">
         <nav className="tabs-nav glass-panel" style={{ display: 'flex', alignItems: 'center' }}>
-          {['input', 'analysis', 'visualizations', 'chatbot'].map(t => (
+          {['input', 'analysis', 'visualizations', 'chatbot', 'patient_list'].map(t => (
             <button key={t} className={`tab-btn ${activeTab === t ? 'active' : ''}`} onClick={() => setActiveTab(t)}>
-              {t === 'input' ? 'Input Report' : t === 'analysis' ? 'Analysis Results' : t === 'visualizations' ? 'Visualizations' : 'AI Chatbot'}
+              {t === 'input' ? 'Input Report' : t === 'analysis' ? 'Analysis Results' : t === 'visualizations' ? 'Visualizations' : t === 'chatbot' ? 'AI Chatbot' : 'Patient List'}
             </button>
           ))}
           <button onClick={toggleTheme} style={{ marginLeft: 'auto', marginRight: '16px', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-primary)', fontSize: '1.4rem' }} title="Toggle Theme">
@@ -424,11 +392,6 @@ export default function App() {
                 </Expander>
 
                 <button type="submit" className="btn-primary w-full mt-4" disabled={!patientId}>{rStatus}</button>
-                {patientId && (
-                  <button type="button" className="btn-primary w-full mt-4" style={{ background: 'var(--danger)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }} onClick={handleDeletePatient}>
-                    Delete Patient Data
-                  </button>
-                )}
               </form>
             </section>
           )}
@@ -519,8 +482,49 @@ export default function App() {
               </div>
             </section>
           )}
+
+          {activeTab === 'patient_list' && (
+            <section className="tab-content glass-panel scrollable-content" style={{ position: 'relative' }}>
+              <span className="badge ok" style={{ position: 'absolute', top: '24px', right: '24px' }}>{allPatients.length} Total Patients</span>
+              <h2>Patient List</h2>
+              <p className="subtitle" style={{ marginBottom: '32px' }}>View and manage all patients in the system.</p>
+              
+              <div className="grid-2">
+                {allPatients.map(p => {
+                  const pId = p._id || p.id;
+                  const isActive = patientId === pId;
+                  return (
+                    <div key={pId} className={`patient-card ${isActive ? 'active' : ''}`} onClick={() => switchPatient(p)}>
+                      <div className="patient-avatar"></div>
+                      <div style={{ flex: 1, marginLeft: '16px' }}>
+                        <div className="fw-bold" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {p.name} {isActive && <span className="badge ok" style={{ padding: '2px 6px', fontSize: '0.65rem' }}>Active</span>}
+                        </div>
+                        <div className="text-sm text-dim" style={{ marginTop: '4px' }}>{p.age} Yrs | {p.gender} | {p.blood_group}</div>
+                      </div>
+                      <button className="btn-danger-small" onClick={(e) => { e.stopPropagation(); deleteAnyPatient(pId); }}>Delete</button>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
         </div>
       </main>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.isOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-panel">
+            <h3>Confirm Deletion</h3>
+            <p>Are you sure you want to permanently delete this patient and all associated reports?<br />This action cannot be undone.</p>
+            <div className="modal-actions">
+              <button className="btn-secondary" onClick={() => setDeleteModal({ isOpen: false, pId: null, isAllData: false })}>Cancel</button>
+              <button className="btn-danger-small" style={{ fontSize: '1rem', padding: '10px 20px' }} onClick={executeDelete}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

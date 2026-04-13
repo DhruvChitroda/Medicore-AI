@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Depends, Path
 from fastapi.middleware.cors import CORSMiddleware
 from bson import ObjectId
 import random
@@ -22,6 +22,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def valid_patient_id(patient_id: str = Path(...)):
+    if not ObjectId.is_valid(patient_id):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+    return patient_id
+
 @app.post("/patients/", response_model=schemas.Patient)
 async def create_patient(patient: schemas.PatientCreate):
     existing = await patients_collection.find_one({
@@ -43,18 +48,14 @@ async def read_patients():
     return patients
 
 @app.get("/patients/{patient_id}", response_model=schemas.Patient)
-async def read_patient(patient_id: str):
-    if not ObjectId.is_valid(patient_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
+async def read_patient(patient_id: str = Depends(valid_patient_id)):
     patient = await patients_collection.find_one({"_id": ObjectId(patient_id)})
     if patient is None:
         raise HTTPException(status_code=404, detail="Patient not found")
     return patient
 
 @app.delete("/patients/{patient_id}")
-async def delete_patient(patient_id: str):
-    if not ObjectId.is_valid(patient_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
+async def delete_patient(patient_id: str = Depends(valid_patient_id)):
     delete_result = await patients_collection.delete_one({"_id": ObjectId(patient_id)})
     if delete_result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -63,10 +64,8 @@ async def delete_patient(patient_id: str):
 
 @app.post("/patients/{patient_id}/reports/", response_model=schemas.LabReport)
 async def create_report_for_patient(
-    patient_id: str, report: schemas.LabReportCreate
+    report: schemas.LabReportCreate, patient_id: str = Depends(valid_patient_id)
 ):
-    if not ObjectId.is_valid(patient_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
     report_dict = report.model_dump()
     report_dict["patient_id"] = patient_id
     
@@ -75,9 +74,7 @@ async def create_report_for_patient(
     return created_report
 
 @app.get("/patients/{patient_id}/reports/", response_model=List[schemas.LabReport])
-async def get_patient_reports(patient_id: str):
-    if not ObjectId.is_valid(patient_id):
-        raise HTTPException(status_code=400, detail="Invalid ID")
+async def get_patient_reports(patient_id: str = Depends(valid_patient_id)):
     reports = await reports_collection.find({"patient_id": patient_id}).to_list(100)
     return reports
 
